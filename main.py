@@ -2,6 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy
 import warnings
+import weakref
+import itertools
 warnings.simplefilter('ignore', numpy.RankWarning)
 
 def regression_models(df, plot=False):
@@ -34,9 +36,12 @@ def plot_regression(df, model, name):
 	plt.show()
 
 class VM:
-	def __init__(self, type, id, memory, compute):
+	instances = []
+	id_iter = itertools.count()
+	def __init__(self, type, memory, compute):
+		self.__class__.instances.append(weakref.proxy(self))
 		self.type = type
-		self.id = id
+		self.id = next(self.id_iter)
 		self.memory = memory
 		self.compute = compute
 		self.lambdas = []
@@ -55,6 +60,7 @@ class VM:
 		self.lambdas.append(lambda_props)
 
 	def list_lambda(self):
+		print(f'VM ID : ' + str(self.id))
 		print(self.lambdas)
 
 df = pd.read_csv('dataset.csv')
@@ -77,7 +83,7 @@ for i in range(int(num_jobs)):
 		sv_mem = SV_Mem.__call__(video_input_size)
 		print(sv_mem)
 
-		AWS_large_1 = VM('AWS_large', 1, 8000, 2) # Cold Start
+		AWS_large_1 = VM('AWS_large', 8000, 2) # Cold Start
 		AWS_large_1.assign_lambda({'1_1': sv_mem})
 
 		ef_exec = EF_Exec.__call__(video_input_size)
@@ -97,7 +103,7 @@ for i in range(int(num_jobs)):
 				AWS_large_1.assign_lambda({lambda_id: ef_mem})
 			print("Data Passing Method from Split Video to Extract Frame: VM-Storage")
 		else:
-			VMs_EF = [VM('AWS_large', j, 8000, 2) for j in range(fanout_degree)]
+			VMs_EF = [VM('AWS_large', 8000, 2) for j in range(fanout_degree)]
 			for VM_EF, count in zip(VMs_EF, range(fanout_degree)):
 				lambda_id = '2_' + str(count+1)
 				VM_EF.assign_lambda({lambda_id: ef_mem})
@@ -120,15 +126,15 @@ for i in range(int(num_jobs)):
 				VM_EF.assign_lambda({lambda_id: cf_mem})
 			print("Data Passing Method from Extract Frame to Classify Frame: VM-Storage")
 		else:
-			VMs_CF = [VM('AWS_large', j, 8000, 2) for j in range(fanout_degree)]
+			VMs_CF = [VM('AWS_large', 8000, 2) for j in range(fanout_degree)]
 			for VM_CF, count in zip(VMs_CF, range(fanout_degree)):
 				lambda_id = '3_' + str(count+1)
 				VM_CF.assign_lambda({lambda_id: cf_mem})
 			print("Data Passing Method from Extract Frame to Classify Frame: Direct-Passing")
 
-		# print("The lambda functions assigned to this VM are ")	
-		# for VM_EF in VMs_EF:
-		# 	VM_EF.list_lambda()
+		print("The lambda functions assigned to each VM are: ")	
+		for A in VM.instances:
+			A.list_lambda()
 	
 # References
 # https://medium.com/google-cloud/understanding-and-profiling-gce-cold-boot-time-32c209fe86ab
