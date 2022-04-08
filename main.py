@@ -4,6 +4,7 @@ import numpy
 import warnings
 import weakref
 import itertools
+import gc
 warnings.simplefilter('ignore', numpy.RankWarning)
 
 def regression_models(df, plot=False):
@@ -41,17 +42,16 @@ def plot_regression(df, model, name):
 class VM:
 	# A class which defines a virtual machine
 
-	instances = []
 	id_iter = itertools.count()
 	def __init__(self, type, memory, compute):
 		# Constructor to initialize a VM
 
-		self.__class__.instances.append(weakref.proxy(self))
 		self.type = type
 		self.id = next(self.id_iter)
 		self.memory = memory
 		self.compute = compute
 		self.lambdas = []
+		self.display = [] 
 
 	def assign_lambda(self, lambda_props):
 		# Function to assign a lambda function to the VM
@@ -63,15 +63,17 @@ class VM:
 		while memory > self.memory:
 			print(self.memory)
 			print(memory)
-			self.memory = self.memory + self.lambdas.pop(0)
+			self.memory = self.memory + next(iter(self.lambdas.pop(0).values()))
 		self.memory = self.memory - memory
 		self.lambdas.append(lambda_props)
+		self.display.append({id: abs(memory)})
+
 
 	def list_lambda(self):
 		# Display the lambda functions currently assigned to the VM
 
 		print(f'VM ID : ' + str(self.id))
-		print(self.lambdas)
+		print(self.display)
 
 df = pd.read_csv('dataset.csv')
 
@@ -142,5 +144,7 @@ for i in range(int(num_jobs)):
 			print("Data Passing Method from Extract Frame to Classify Frame: Direct-Passing")
 
 		print("The lambda functions assigned to each VM are: ")	
-		for A in VM.instances:
-			A.list_lambda()
+		for obj in gc.get_objects():
+			if isinstance(obj, VM):
+				obj.list_lambda()
+				del obj
